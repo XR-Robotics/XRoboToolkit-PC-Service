@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_strings_internal
+Description: Abseil strings_internal library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_config = 20240116, absl_core_headers = 20240116, absl_endian = 20240116, absl_raw_logging_internal = 20240116, absl_type_traits = 20240116
+Libs: -L${libdir}  -labsl_strings_internal 
+Cflags: -I${includedir} -DNOMINMAX

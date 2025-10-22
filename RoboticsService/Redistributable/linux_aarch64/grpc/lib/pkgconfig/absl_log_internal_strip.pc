@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_log_internal_strip
+Description: Abseil log_internal_strip library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_log_internal_message = 20240116, absl_log_internal_nullstream = 20240116, absl_log_severity = 20240116
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

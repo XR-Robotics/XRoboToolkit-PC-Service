@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_flags_usage_internal
+Description: Abseil flags_usage_internal library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_config = 20240116, absl_flags_config = 20240116, absl_flags = 20240116, absl_flags_commandlineflag = 20240116, absl_flags_internal = 20240116, absl_flags_path_util = 20240116, absl_flags_private_handle_accessor = 20240116, absl_flags_program_name = 20240116, absl_flags_reflection = 20240116, absl_strings = 20240116, absl_synchronization = 20240116
+Libs: -L${libdir}  -labsl_flags_usage_internal 
+Cflags: -I${includedir} -DNOMINMAX

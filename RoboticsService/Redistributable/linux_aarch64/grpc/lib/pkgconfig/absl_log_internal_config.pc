@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_log_internal_config
+Description: Abseil log_internal_config library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_config = 20240116, absl_core_headers = 20240116
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_civil_time
+Description: Abseil civil_time library
+URL: https://abseil.io/
+Version: 20240116
+Requires:
+Libs: -L${libdir}  -labsl_civil_time 
+Cflags: -I${includedir} -DNOMINMAX

@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_bind_front
+Description: Abseil bind_front library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_base_internal = 20240116, absl_compressed_tuple = 20240116
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

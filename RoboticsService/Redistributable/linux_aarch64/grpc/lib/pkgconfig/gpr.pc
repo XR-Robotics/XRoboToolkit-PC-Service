@@ -1,0 +1,13 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib
+
+Name: gpr
+Description: gRPC platform support library
+Version: 43.0.0
+Cflags: -I${includedir}
+Requires: absl_any_invocable absl_base absl_bits absl_check absl_cord absl_core_headers absl_flags absl_flags_marshalling absl_log absl_log_globals absl_log_severity absl_memory absl_optional absl_random_random absl_status absl_str_format absl_strings absl_synchronization absl_time absl_variant
+Requires.private: 
+Libs: -L${libdir} -lgpr
+Libs.private: 

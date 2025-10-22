@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_hash
+Description: Abseil hash library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_bits = 20240116, absl_city = 20240116, absl_config = 20240116, absl_core_headers = 20240116, absl_endian = 20240116, absl_fixed_array = 20240116, absl_function_ref = 20240116, absl_meta = 20240116, absl_int128 = 20240116, absl_strings = 20240116, absl_optional = 20240116, absl_variant = 20240116, absl_utility = 20240116, absl_low_level_hash = 20240116
+Libs: -L${libdir}  -labsl_hash 
+Cflags: -I${includedir} -DNOMINMAX

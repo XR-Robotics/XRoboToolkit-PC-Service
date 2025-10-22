@@ -1,0 +1,12 @@
+prefix=/home/orin_pico/.local
+exec_prefix=${prefix}
+libdir=/home/orin_pico/.local/lib
+includedir=/home/orin_pico/.local/include
+
+Name: absl_flags_reflection
+Description: Abseil flags_reflection library
+URL: https://abseil.io/
+Version: 20240116
+Requires: absl_config = 20240116, absl_flags_commandlineflag = 20240116, absl_flags_private_handle_accessor = 20240116, absl_flags_config = 20240116, absl_strings = 20240116, absl_synchronization = 20240116, absl_flat_hash_map = 20240116, absl_no_destructor = 20240116
+Libs: -L${libdir}  -labsl_flags_reflection 
+Cflags: -I${includedir} -DNOMINMAX
