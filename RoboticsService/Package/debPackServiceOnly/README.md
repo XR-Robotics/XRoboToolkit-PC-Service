@@ -54,5 +54,26 @@ container to guarantee a glibc 2.31 target. The workflow produces both
 ├── runService.sh                       # entry point (sets LD_LIBRARY_PATH etc.)
 ├── setting.ini                         # default configuration
 ├── lib/                                # Qt 6 + ICU shared libraries
-└── plugins/                            # Qt plugins (tls, networkinformation, sqldrivers)
+├── plugins/                            # Qt plugins (tls, networkinformation, sqldrivers)
+└── sdk/                                # client SDK for 3rd-party apps
+    ├── lib/
+    │   └── libPXREARobotSDK.so
+    └── include/
+        └── PXREARobotSDK.h
 ```
+
+## Linking against the SDK
+
+Third-party apps that want to talk to RoboticsServiceProcess via the
+client SDK can build with:
+
+```bash
+gcc your_app.c \
+    -I/opt/apps/xrobotoolkit-pc-service/sdk/include \
+    -L/opt/apps/xrobotoolkit-pc-service/sdk/lib \
+    -lPXREARobotSDK \
+    -Wl,-rpath,/opt/apps/xrobotoolkit-pc-service/sdk/lib \
+    -o your_app
+```
+
+Or run with `LD_LIBRARY_PATH=/opt/apps/xrobotoolkit-pc-service/sdk/lib`.

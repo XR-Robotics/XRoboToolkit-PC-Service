@@ -2,11 +2,13 @@ Package: xrobotoolkit-pc-service
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: roboticsservice.support@bytedance.com
-Depends: libc6 (>= 2.31), libstdc++6 (>= 9), libgcc-s1 (>= 4), libdbus-1-3, libfontconfig1, libglib2.0-0
+Depends: libc6 (>= @LIBC_MIN@), libstdc++6 (>= @STDCPP_MIN@), libgcc-s1 (>= 4), libdbus-1-3, libfontconfig1, libglib2.0-0
 Section: utils
 Priority: optional
 Homepage: https://business-cn.picoxr.com/
 Description: XRoboToolkit PC Service (headless, service only)
  Provides the headless gRPC service process for XRoboToolkit / PICO robotics
- PC-side integration. This package contains only RoboticsServiceProcess and
- the Qt / gRPC runtime libraries required to run it. No GUI demos, no QML.
+ PC-side integration. This package contains RoboticsServiceProcess, the Qt /
+ gRPC runtime libraries required to run it, and the client-side
+ PXREARobotSDK shared library + header under sdk/ for third-party apps. No
+ GUI demos, no QML.

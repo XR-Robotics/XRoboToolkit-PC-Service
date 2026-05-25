@@ -117,6 +117,8 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 echo "==> gRPC installation tree:"
-find "$PREFIX" -maxdepth 3 -type d | sed 's/^/  /'
+# Use `|| true` on the `find ... | sed` pipeline as a defensive measure
+# against SIGPIPE (exit 141) under `set -o pipefail`.
+find "$PREFIX" -maxdepth 3 -type d | sed 's/^/  /' || true
 echo "==> Total static libraries installed: $(find "$LIB_DIR" -maxdepth 1 -name '*.a' | wc -l)"
 echo "==> Done."
