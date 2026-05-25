@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+chmod +x /opt/apps/xrobotoolkit-pc-service/RoboticsServiceProcess  || true
+chmod +x /opt/apps/xrobotoolkit-pc-service/runService.sh           || true
+exit 0
