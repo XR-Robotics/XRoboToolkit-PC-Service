@@ -1,7 +1,13 @@
-name: Build Ubuntu 20.04 DEB (service only)
+name: Build Ubuntu DEB (service only)
 
 # Manual-only trigger. Produces a service-only .deb (no GUI demos) for
-# both amd64 and arm64, targeting Ubuntu 20.04 (glibc 2.31) and newer.
+# every (distro, arch) combination defined in the build matrix:
+#   - ubuntu20.04 / amd64  (glibc 2.31, libstdc++ from gcc-9)
+#   - ubuntu20.04 / arm64
+#   - ubuntu22.04 / amd64  (glibc 2.35, libstdc++ from gcc-12)
+#   - ubuntu22.04 / arm64
+# Each job runs entirely inside a matching Ubuntu container so its
+# binaries link only against symbols that exist on the target distro.
 on:
   workflow_dispatch:
     inputs:
@@ -23,17 +29,45 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.arch }})
+    name: Build (${{ matrix.distro }} / ${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          # ---------- Ubuntu 20.04 ----------
+          - distro: ubuntu20.04
+            container_image: 'ubuntu:20.04'
+            libc_min: '2.31'
+            stdcpp_min: '9'
+            arch: amd64
             runner: ubuntu-22.04
             qt_arch: linux_gcc_64
             qt_host: linux
             uname_arch: x86_64
-          - arch: arm64
+          - distro: ubuntu20.04
+            container_image: 'ubuntu:20.04'
+            libc_min: '2.31'
+            stdcpp_min: '9'
+            arch: arm64
+            runner: ubuntu-22.04-arm
+            qt_arch: linux_gcc_arm64
+            qt_host: linux_arm64
+            uname_arch: aarch64
+          # ---------- Ubuntu 22.04 ----------
+          - distro: ubuntu22.04
+            container_image: 'ubuntu:22.04'
+            libc_min: '2.35'
+            stdcpp_min: '12'
+            arch: amd64
+            runner: ubuntu-22.04
+            qt_arch: linux_gcc_64
+            qt_host: linux
+            uname_arch: x86_64
+          - distro: ubuntu22.04
+            container_image: 'ubuntu:22.04'
+            libc_min: '2.35'
+            stdcpp_min: '12'
+            arch: arm64
             runner: ubuntu-22.04-arm
             qt_arch: linux_gcc_arm64
             qt_host: linux_arm64
@@ -41,11 +75,8 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
 
-    # Run the whole build inside Ubuntu 20.04 so the produced binaries
-    # link against glibc 2.31 / libstdc++ from gcc-9 and remain usable
-    # on Ubuntu 20.04 targets.
     container:
-      image: ubuntu:20.04
+      image: ${{ matrix.container_image }}
       env:
         DEBIAN_FRONTEND: noninteractive
         TZ: Etc/UTC
@@ -56,14 +87,15 @@ jobs:
       QT_ROOT: ${{ github.workspace }}/Qt
 
     steps:
-      - name: Install base build tools inside Ubuntu 20.04
+      - name: Install base build tools inside ${{ matrix.distro }}
         shell: bash
         run: |
           set -euxo pipefail
           apt-get update
           # python3-dev is needed because some aqtinstall transitive
-          # deps (notably pyzstd) ship no aarch64 cp38 wheels and fall
-          # back to building from source, which requires Python.h.
+          # deps (notably pyzstd) ship no aarch64 cp38 wheels on
+          # Ubuntu 20.04 and fall back to source builds requiring
+          # Python.h. Harmless on 22.04 where wheels exist.
           apt-get install -y --no-install-recommends \
             ca-certificates curl wget git unzip xz-utils \
             build-essential pkg-config \
@@ -74,7 +106,9 @@ jobs:
             libxkbcommon-dev \
             dpkg-dev fakeroot file patchelf
           # Ubuntu 20.04 ships CMake 3.16 which is too old for current
-          # gRPC and Qt; install an up-to-date Kitware CMake binary.
+          # gRPC and Qt; 22.04 ships 3.22 which is borderline. Install
+          # an up-to-date Kitware CMake binary in both cases for
+          # consistency.
           ARCH_FOR_CMAKE='${{ matrix.uname_arch }}'
           curl -fsSL -o /tmp/cmake.tar.gz \
             "https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-${ARCH_FOR_CMAKE}.tar.gz"
@@ -120,6 +154,8 @@ jobs:
       # notice.txt). We build it from source and cache the install dir.
       # amd64 reuses the prebuilt set already in
       # Redistributable/linux/grpc/lib.
+      # The cache key includes the distro so 20.04 and 22.04 builds
+      # never share gRPC binaries with different glibc requirements.
       # ---------------------------------------------------------------
       - name: Cache gRPC install (arm64 only)
         if: matrix.arch == 'arm64'
@@ -127,7 +163,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.GRPC_INSTALL_DIR }}
-          key: grpc-${{ matrix.arch }}-${{ inputs.grpc_version }}-ubuntu2004-${{ hashFiles('scripts/ci/build-grpc.sh') }}
+          key: grpc-${{ matrix.distro }}-${{ matrix.arch }}-${{ inputs.grpc_version }}-${{ hashFiles('scripts/ci/build-grpc.sh') }}
 
       - name: Build gRPC from source (arm64, cache miss)
         if: matrix.arch == 'arm64' && steps.cache-grpc.outputs.cache-hit != 'true'
@@ -161,10 +197,31 @@ jobs:
             "$QT_PREFIX" "${{ inputs.build_number }}"
 
       # ---------------------------------------------------------------
-      # Package as .deb (service only, no GUI / no demos)
+      # Build client SDK (PXREARobotSDK)
+      # PXREARobotSDK is a standalone shared library used by 3rd-party
+      # apps to talk to RoboticsServiceProcess via gRPC. Its CMake
+      # project is separate from the main RoboticsService one and is
+      # built here so the .so and its header can be bundled into the
+      # final .deb.
+      # ---------------------------------------------------------------
+      - name: Build PXREARobotSDK (Release)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x scripts/ci/build-pxrearobotsdk.sh
+          JOBS=$(nproc) scripts/ci/build-pxrearobotsdk.sh \
+            "${{ inputs.build_number }}"
+
+      # ---------------------------------------------------------------
+      # Package as .deb (service only, no GUI / no demos).
+      # LIBC_MIN / STDCPP_MIN are stamped into Depends so apt will
+      # refuse to install a binary on hosts with too-old runtimes.
       # ---------------------------------------------------------------
       - name: Build service-only .deb
         shell: bash
+        env:
+          LIBC_MIN: ${{ matrix.libc_min }}
+          STDCPP_MIN: ${{ matrix.stdcpp_min }}
         run: |
           set -euxo pipefail
           chmod +x RoboticsService/Package/debPackServiceOnly/*.sh
@@ -174,7 +231,8 @@ jobs:
             "$VERSION" \
             "$GITHUB_WORKSPACE/RoboticsService/bin" \
             "$QT_PREFIX" \
-            "$GITHUB_WORKSPACE/dist"
+            "$GITHUB_WORKSPACE/dist" \
+            "${{ matrix.distro }}"
 
       - name: Inspect produced package
         shell: bash
@@ -188,7 +246,7 @@ jobs:
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xrobotoolkit-pc-service-${{ matrix.arch }}-ubuntu20.04
+          name: xrobotoolkit-pc-service-${{ matrix.distro }}-${{ matrix.arch }}
           path: dist/xrobotoolkit-pc-service_*.deb
           if-no-files-found: error
           retention-days: 30
