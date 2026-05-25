@@ -105,11 +105,14 @@ jobs:
             ${{ matrix.qt_host }} desktop ${{ inputs.qt_version }} ${{ matrix.qt_arch }} \
             --outputdir "$QT_ROOT" \
             --modules qt5compat
-          # Resolve the actual install prefix (e.g. $QT_ROOT/6.7.3/gcc_64)
-          QT_PREFIX="$(find "$QT_ROOT/${{ inputs.qt_version }}" -maxdepth 1 -mindepth 1 -type d | head -n1)"
+          # Resolve the actual install prefix (e.g. $QT_ROOT/6.7.3/gcc_64).
+          # `head -n1` may close the pipe while `find` is still writing,
+          # which would otherwise cause SIGPIPE / exit 141 under
+          # pipefail; the trailing `|| true` swallows that.
+          QT_PREFIX="$(find "$QT_ROOT/${{ inputs.qt_version }}" -maxdepth 1 -mindepth 1 -type d | head -n1 || true)"
           echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
           echo "Resolved Qt prefix: $QT_PREFIX"
-          ls -la "$QT_PREFIX/lib" | head -20
+          ls -la "$QT_PREFIX/lib" | head -20 || true
 
       # ---------------------------------------------------------------
       # arm64 path: the repo intentionally ships no prebuilt gRPC static
@@ -144,7 +147,7 @@ jobs:
           cp -a "$GRPC_INSTALL_DIR/lib/."     "$DEST/lib/"
           cp -a "$GRPC_INSTALL_DIR/include/." "$DEST/include/"
           echo "Static libraries staged:"
-          ls "$DEST/lib" | head -20
+          ls "$DEST/lib" | head -20 || true
 
       # ---------------------------------------------------------------
       # Build RoboticsService
@@ -180,7 +183,7 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/dist"
           dpkg-deb -I "$GITHUB_WORKSPACE/dist"/xrobotoolkit-pc-service_*.deb
           echo "--- contents ---"
-          dpkg-deb -c "$GITHUB_WORKSPACE/dist"/xrobotoolkit-pc-service_*.deb | head -40
+          dpkg-deb -c "$GITHUB_WORKSPACE/dist"/xrobotoolkit-pc-service_*.deb | head -40 || true
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
