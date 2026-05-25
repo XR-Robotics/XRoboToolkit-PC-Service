@@ -61,10 +61,13 @@ jobs:
         run: |
           set -euxo pipefail
           apt-get update
+          # python3-dev is needed because some aqtinstall transitive
+          # deps (notably pyzstd) ship no aarch64 cp38 wheels and fall
+          # back to building from source, which requires Python.h.
           apt-get install -y --no-install-recommends \
             ca-certificates curl wget git unzip xz-utils \
             build-essential pkg-config \
-            python3 python3-pip python3-venv \
+            python3 python3-pip python3-venv python3-dev \
             ninja-build \
             libssl-dev zlib1g-dev \
             libdbus-1-dev libfontconfig1-dev libglib2.0-dev \
