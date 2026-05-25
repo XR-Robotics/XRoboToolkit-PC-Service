@@ -72,7 +72,7 @@ jobs:
             libssl-dev zlib1g-dev \
             libdbus-1-dev libfontconfig1-dev libglib2.0-dev \
             libxkbcommon-dev \
-            dpkg-dev fakeroot file
+            dpkg-dev fakeroot file patchelf
           # Ubuntu 20.04 ships CMake 3.16 which is too old for current
           # gRPC and Qt; install an up-to-date Kitware CMake binary.
           ARCH_FOR_CMAKE='${{ matrix.uname_arch }}'
