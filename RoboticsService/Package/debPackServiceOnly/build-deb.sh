@@ -85,6 +85,32 @@ install -m 0755 "$SCRIPT_DIR/postinst" "$DEBIAN_DIR/postinst"
 install -m 0755 "$SCRIPT_DIR/prerm"    "$DEBIAN_DIR/prerm"
 install -m 0755 "$SCRIPT_DIR/postrm"   "$DEBIAN_DIR/postrm"
 
+echo "==> Setting RPATH on the main binary and project libraries"
+# Without this, running ./RoboticsServiceProcess directly fails with
+# "libBusiness.so: cannot open shared object file" because the dynamic
+# linker doesn't know to look in the install directory. With RPATH set
+# to $ORIGIN:$ORIGIN/lib, the process finds:
+#   - sibling project libs (libBusiness.so, libCommonUtils.so, ...)
+#     in $ORIGIN (= /opt/apps/xrobotoolkit-pc-service)
+#   - Qt6 and ICU libs in $ORIGIN/lib
+# runService.sh is kept as a convenience wrapper but is no longer
+# strictly required.
+if ! command -v patchelf >/dev/null 2>&1; then
+    echo "ERROR: patchelf not installed; install it via apt-get install patchelf" >&2
+    exit 1
+fi
+RPATH='$ORIGIN:$ORIGIN/lib'
+patchelf --force-rpath --set-rpath "$RPATH" "$APP_DIR/RoboticsServiceProcess"
+for so in libBusiness.so libCommonUtils.so \
+          libDeviceConnectionManager.so libPXREAGRPCServer.so; do
+    patchelf --force-rpath --set-rpath "$RPATH" "$APP_DIR/$so"
+done
+# Also normalise Qt's own libs to $ORIGIN so the chain keeps working
+# regardless of what aqtinstall baked in.
+for so in "$APP_DIR/lib"/libQt6*.so.*.*.* "$APP_DIR/lib"/libicu*.so.*.*; do
+    [ -f "$so" ] && patchelf --force-rpath --set-rpath '$ORIGIN' "$so" || true
+done
+
 echo "==> Stripping ELF binaries to reduce package size"
 # Best-effort: strip is platform-specific in cross builds; ignore failures.
 find "$APP_DIR" -type f \( -name '*.so' -o -name '*.so.*' \
