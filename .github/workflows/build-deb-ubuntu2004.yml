@@ -1,0 +1,188 @@
+name: Build Ubuntu 20.04 DEB (service only)
+
+# Manual-only trigger. Produces a service-only .deb (no GUI demos) for
+# both amd64 and arm64, targeting Ubuntu 20.04 (glibc 2.31) and newer.
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number suffix; final version is 1.0.0.<build_number>'
+        required: false
+        default: '0'
+      qt_version:
+        description: 'Qt 6 version installed via aqtinstall (must support linux_gcc_arm64)'
+        required: false
+        default: '6.7.3'
+      grpc_version:
+        description: 'gRPC git tag built from source for arm64 (e.g. v1.66.2)'
+        required: false
+        default: 'v1.66.2'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            qt_arch: linux_gcc_64
+            qt_host: linux
+            uname_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            qt_arch: linux_gcc_arm64
+            qt_host: linux_arm64
+            uname_arch: aarch64
+
+    runs-on: ${{ matrix.runner }}
+
+    # Run the whole build inside Ubuntu 20.04 so the produced binaries
+    # link against glibc 2.31 / libstdc++ from gcc-9 and remain usable
+    # on Ubuntu 20.04 targets.
+    container:
+      image: ubuntu:20.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: Etc/UTC
+
+    env:
+      VERSION: 1.0.0.${{ inputs.build_number }}
+      GRPC_INSTALL_DIR: ${{ github.workspace }}/grpc-install
+      QT_ROOT: ${{ github.workspace }}/Qt
+
+    steps:
+      - name: Install base build tools inside Ubuntu 20.04
+        shell: bash
+        run: |
+          set -euxo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl wget git unzip xz-utils \
+            build-essential pkg-config \
+            python3 python3-pip python3-venv \
+            ninja-build \
+            libssl-dev zlib1g-dev \
+            libdbus-1-dev libfontconfig1-dev libglib2.0-dev \
+            libxkbcommon-dev \
+            dpkg-dev fakeroot file
+          # Ubuntu 20.04 ships CMake 3.16 which is too old for current
+          # gRPC and Qt; install an up-to-date Kitware CMake binary.
+          ARCH_FOR_CMAKE='${{ matrix.uname_arch }}'
+          curl -fsSL -o /tmp/cmake.tar.gz \
+            "https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-${ARCH_FOR_CMAKE}.tar.gz"
+          mkdir -p /opt/cmake
+          tar --strip-components=1 -xzf /tmp/cmake.tar.gz -C /opt/cmake
+          ln -sf /opt/cmake/bin/cmake  /usr/local/bin/cmake
+          ln -sf /opt/cmake/bin/ctest  /usr/local/bin/ctest
+          ln -sf /opt/cmake/bin/cpack  /usr/local/bin/cpack
+          cmake --version
+
+      - name: Configure git safe.directory
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install aqtinstall and download Qt6 (${{ inputs.qt_version }} ${{ matrix.qt_arch }})
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m venv /opt/aqt-venv
+          /opt/aqt-venv/bin/pip install --upgrade pip
+          /opt/aqt-venv/bin/pip install "aqtinstall>=3.1"
+          mkdir -p "$QT_ROOT"
+          /opt/aqt-venv/bin/aqt install-qt \
+            ${{ matrix.qt_host }} desktop ${{ inputs.qt_version }} ${{ matrix.qt_arch }} \
+            --outputdir "$QT_ROOT" \
+            --modules qt5compat
+          # Resolve the actual install prefix (e.g. $QT_ROOT/6.7.3/gcc_64)
+          QT_PREFIX="$(find "$QT_ROOT/${{ inputs.qt_version }}" -maxdepth 1 -mindepth 1 -type d | head -n1)"
+          echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
+          echo "Resolved Qt prefix: $QT_PREFIX"
+          ls -la "$QT_PREFIX/lib" | head -20
+
+      # ---------------------------------------------------------------
+      # arm64 path: the repo intentionally ships no prebuilt gRPC static
+      # libraries for aarch64 (see Redistributable/linux_aarch64/grpc/
+      # notice.txt). We build it from source and cache the install dir.
+      # amd64 reuses the prebuilt set already in
+      # Redistributable/linux/grpc/lib.
+      # ---------------------------------------------------------------
+      - name: Cache gRPC install (arm64 only)
+        if: matrix.arch == 'arm64'
+        id: cache-grpc
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GRPC_INSTALL_DIR }}
+          key: grpc-${{ matrix.arch }}-${{ inputs.grpc_version }}-ubuntu2004-${{ hashFiles('scripts/ci/build-grpc.sh') }}
+
+      - name: Build gRPC from source (arm64, cache miss)
+        if: matrix.arch == 'arm64' && steps.cache-grpc.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x scripts/ci/build-grpc.sh
+          JOBS=$(nproc) scripts/ci/build-grpc.sh "${{ inputs.grpc_version }}" "$GRPC_INSTALL_DIR"
+
+      - name: Stage gRPC into RoboticsService/Redistributable (arm64)
+        if: matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          DEST="$GITHUB_WORKSPACE/RoboticsService/Redistributable/linux_aarch64/grpc"
+          mkdir -p "$DEST/lib" "$DEST/include"
+          cp -a "$GRPC_INSTALL_DIR/lib/."     "$DEST/lib/"
+          cp -a "$GRPC_INSTALL_DIR/include/." "$DEST/include/"
+          echo "Static libraries staged:"
+          ls "$DEST/lib" | head -20
+
+      # ---------------------------------------------------------------
+      # Build RoboticsService
+      # ---------------------------------------------------------------
+      - name: Build RoboticsService (Release)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x scripts/ci/build-roboticsservice.sh
+          JOBS=$(nproc) scripts/ci/build-roboticsservice.sh \
+            "$QT_PREFIX" "${{ inputs.build_number }}"
+
+      # ---------------------------------------------------------------
+      # Package as .deb (service only, no GUI / no demos)
+      # ---------------------------------------------------------------
+      - name: Build service-only .deb
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x RoboticsService/Package/debPackServiceOnly/*.sh
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          RoboticsService/Package/debPackServiceOnly/build-deb.sh \
+            "${{ matrix.arch }}" \
+            "$VERSION" \
+            "$GITHUB_WORKSPACE/RoboticsService/bin" \
+            "$QT_PREFIX" \
+            "$GITHUB_WORKSPACE/dist"
+
+      - name: Inspect produced package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ls -lh "$GITHUB_WORKSPACE/dist"
+          dpkg-deb -I "$GITHUB_WORKSPACE/dist"/xrobotoolkit-pc-service_*.deb
+          echo "--- contents ---"
+          dpkg-deb -c "$GITHUB_WORKSPACE/dist"/xrobotoolkit-pc-service_*.deb | head -40
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xrobotoolkit-pc-service-${{ matrix.arch }}-ubuntu20.04
+          path: dist/xrobotoolkit-pc-service_*.deb
+          if-no-files-found: error
+          retention-days: 30
