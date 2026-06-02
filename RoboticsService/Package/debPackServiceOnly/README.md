@@ -35,10 +35,10 @@ xrobotoolkit-pc-service_<version>_<arch>.deb
 
 ## Continuous integration
 
-The companion workflow `.github/workflows/build-deb-ubuntu2004.yml`
-calls this script after building the project inside an `ubuntu:20.04`
-container to guarantee a glibc 2.31 target. The workflow produces both
-`amd64` and `arm64` artifacts.
+The companion workflow `.github/workflows/build-deb.yml` calls this script
+after building the project inside the target Ubuntu container. The workflow
+currently produces `amd64` and `arm64` artifacts for Ubuntu 20.04, 22.04,
+and 24.04.
 
 ## Runtime contents
 

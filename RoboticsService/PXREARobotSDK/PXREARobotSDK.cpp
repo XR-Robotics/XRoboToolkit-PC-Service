@@ -36,7 +36,7 @@ static unsigned GetCurrentPid()
 
 static void OutputDebug(const char* str)
 {
-    std::cout << str;
+    std::cout << "[INFO] PXREARobotSDK: " << str << std::endl;
 }
 
 static unsigned GetCurrentPid()
@@ -297,11 +297,10 @@ T PXREAGetSDKClientConfig(const char* section, const char* key, const T& default
 }
 int PXREAInit(void* context,pfPXREAClientCallback cliCallback,unsigned mask)
 {
-    OutputDebug("initialize sdk,connect");
+    OutputDebug("initialize sdk,connect to server");
     std::string addr = PXREAGetSDKClientConfig("Client","connectAddr",std::string("127.0.0.1"));
     std::string port = PXREAGetSDKClientConfig("Client","connectPort",std::string("60061"));
     std::string connectStr= addr+":"+port;
-    OutputDebug(connectStr.c_str());
     gOnPXREAClientCallback = cliCallback;
     g_mask = mask;
     g_context = context;

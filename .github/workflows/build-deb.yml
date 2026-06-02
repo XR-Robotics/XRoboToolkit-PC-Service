@@ -6,6 +6,8 @@ name: Build Ubuntu DEB (service only)
 #   - ubuntu20.04 / arm64
 #   - ubuntu22.04 / amd64  (glibc 2.35, libstdc++ from gcc-12)
 #   - ubuntu22.04 / arm64
+#   - ubuntu24.04 / amd64  (glibc 2.39, libstdc++ from gcc-14)
+#   - ubuntu24.04 / arm64
 # Each job runs entirely inside a matching Ubuntu container so its
 # binaries link only against symbols that exist on the target distro.
 on:
@@ -72,6 +74,25 @@ jobs:
             qt_arch: linux_gcc_arm64
             qt_host: linux_arm64
             uname_arch: aarch64
+          # ---------- Ubuntu 24.04 ----------
+          - distro: ubuntu24.04
+            container_image: 'ubuntu:24.04'
+            libc_min: '2.39'
+            stdcpp_min: '14'
+            arch: amd64
+            runner: ubuntu-24.04
+            qt_arch: linux_gcc_64
+            qt_host: linux
+            uname_arch: x86_64
+          - distro: ubuntu24.04
+            container_image: 'ubuntu:24.04'
+            libc_min: '2.39'
+            stdcpp_min: '14'
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            qt_arch: linux_gcc_arm64
+            qt_host: linux_arm64
+            uname_arch: aarch64
 
     runs-on: ${{ matrix.runner }}
 
@@ -95,7 +116,7 @@ jobs:
           # python3-dev is needed because some aqtinstall transitive
           # deps (notably pyzstd) ship no aarch64 cp38 wheels on
           # Ubuntu 20.04 and fall back to source builds requiring
-          # Python.h. Harmless on 22.04 where wheels exist.
+          # Python.h. Harmless on newer distros where wheels exist.
           apt-get install -y --no-install-recommends \
             ca-certificates curl wget git unzip xz-utils \
             build-essential pkg-config \
@@ -107,7 +128,7 @@ jobs:
             dpkg-dev fakeroot file patchelf
           # Ubuntu 20.04 ships CMake 3.16 which is too old for current
           # gRPC and Qt; 22.04 ships 3.22 which is borderline. Install
-          # an up-to-date Kitware CMake binary in both cases for
+          # an up-to-date Kitware CMake binary across the matrix for
           # consistency.
           ARCH_FOR_CMAKE='${{ matrix.uname_arch }}'
           curl -fsSL -o /tmp/cmake.tar.gz \
@@ -154,7 +175,7 @@ jobs:
       # notice.txt). We build it from source and cache the install dir.
       # amd64 reuses the prebuilt set already in
       # Redistributable/linux/grpc/lib.
-      # The cache key includes the distro so 20.04 and 22.04 builds
+      # The cache key includes the distro so different Ubuntu builds
       # never share gRPC binaries with different glibc requirements.
       # ---------------------------------------------------------------
       - name: Cache gRPC install (arm64 only)
