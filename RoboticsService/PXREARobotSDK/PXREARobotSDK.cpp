@@ -26,6 +26,8 @@ static unsigned GetCurrentPid()
 #endif
 
 #if defined(LINUX_x86) || defined(LINUX_aarch64)
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +38,13 @@ static unsigned GetCurrentPid()
 
 static void OutputDebug(const char* str)
 {
-    std::cout << "[INFO] PXREARobotSDK: " << str << std::endl;
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(now);
+    const auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(now - seconds);
+
+    std::cout << "[INFO] [" << seconds.count() << "."
+              << std::setw(9) << std::setfill('0') << nanoseconds.count()
+              << std::setfill(' ') << "] [PXREARobotSDK]: " << str << std::endl;
 }
 
 static unsigned GetCurrentPid()
