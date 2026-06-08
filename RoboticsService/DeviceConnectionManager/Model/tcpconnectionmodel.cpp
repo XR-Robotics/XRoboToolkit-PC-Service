@@ -60,6 +60,7 @@ void DevConnSDK::TCPConnectionModel::setConnection(QTcpSocket* tcpSocket)
     m_tcpPtr = tcpSocket;
     if(m_tcpPtr)
     {
+        m_tcpPtr->setSocketOption(QAbstractSocket::LowDelayOption, 1);
         connect(m_tcpPtr, SIGNAL(readyRead()), this, SLOT(onReadClientMessage()), Qt::UniqueConnection);
     }
 }
